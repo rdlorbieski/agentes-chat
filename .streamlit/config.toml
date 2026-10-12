@@ -4,3 +4,7 @@ primaryColor = "#0d6656"
 
 [client]
 toolbarMode = "minimal"
+
+[server]
+# Igual ao limite do Caddy (infra/Caddyfile.trecho). Transcrições têm poucos KB.
+maxUploadSize = 20

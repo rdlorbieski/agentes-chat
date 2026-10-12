@@ -3,18 +3,20 @@
 Chat para conversar com os relatórios dos agentes de qualidade do
 **Fita.me** (`fitame-agentes`) e do **CIGA** (`ciga-agentes`).
 
+Endereço: **https://chat-agentes.lorbieski.com.br**
+
 - Escolha o projeto e a campanha (cada issue de prioridades é uma campanha).
 - Pergunte sobre **qualquer achado** de qualquer especialista, não só as 3
   tarefas escolhidas pelo planejador. Compare com campanhas anteriores.
 - Envie transcrições de reunião (`.txt`, `.srt`, `.vtt`) e peça para o chat
   definir ou rever prioridades com base no que foi conversado.
-- Baixe a conversa em Markdown.
+- As conversas ficam salvas (SQLite), com as transcrições de cada uma: reabra,
+  renomeie, exclua ou baixe em Markdown pela barra lateral.
 
-O chat **só lê**. Ele não publica issue, não altera repositório e não guarda
-nada: a conversa e as transcrições ficam só na aba do navegador e somem ao
-recarregar a página (baixe a conversa antes, se quiser guardar). Quando a
-reunião registra algo resolvido ou decidido, o chat oferece um trecho pronto
-para você colar no `contexto/conhecido.md` do repositório de agentes.
+O chat **só lê** o GitHub. Ele não publica issue e não altera nenhum
+repositório. Quando a reunião registra algo resolvido ou decidido, ele oferece
+um trecho pronto para você colar no `contexto/conhecido.md` do repositório de
+agentes.
 
 ## O que o chat recebe
 
@@ -26,62 +28,78 @@ A cada pergunta, o Claude recebe:
 2. As tarefas das campanhas anteriores (até 20).
 3. O `README.md` (o que cada agente olha) e o `contexto/conhecido.md` do
    repositório de agentes.
-4. As transcrições enviadas nesta conversa.
+4. As transcrições salvas na conversa aberta.
+5. O histórico da conversa aberta.
 
 Ele **não** lê o código do Fita.me nem do CIGA: conhece só os trechos que os
 agentes citaram no relatório, e diz quando uma resposta depende de conferir
 o código. Se a lista de achados de uma campanha não coube na issue (corpo
 acima de 60 mil caracteres), o chat avisa que só conhece o plano.
 
-## Publicar no Streamlit Community Cloud (uma vez)
+## Acesso
 
-### 1. Enviar este repositório para o GitHub
+Login simples, só para o chat não ficar aberto na internet: usuário e senha
+vêm de `APP_USUARIO` e `APP_SENHA` no `.env`. Sem eles, vale **`admin` /
+`chat-agentes`**. Troque no `.env` da VPS. O login vale para a aba aberta:
+recarregar a página pede de novo.
 
-Crie um repositório **privado** vazio (ex.: `agentes-chat`) e rode:
+## Deploy na VPS
+
+Mesmo modelo do `fitame-validator-user`: um container na network `edge`, sem
+porta pública, com o Caddy da VPS fazendo o HTTPS e encaminhando o domínio.
+
+| | |
+|---|---|
+| Domínio | `chat-agentes.lorbieski.com.br` |
+| Container | `lorbieski-chat-agentes`, porta interna `8501` |
+| Conversas | volume Docker `conversas`, montado em `/app/data` |
+
+### Primeira vez
+
+1. **DNS:** crie um registro `A` de `chat-agentes.lorbieski.com.br` para o IP
+   da VPS.
+2. **Caddy:** cole o bloco de [`infra/Caddyfile.trecho`](infra/Caddyfile.trecho)
+   no `Caddyfile` do Caddy da VPS e reinicie o Caddy
+   (`docker restart edge_caddy`, no modelo do `infra-edge`). O certificado
+   HTTPS sai sozinho no primeiro acesso.
+3. **Código e segredos**, na VPS:
 
 ```bash
-cd /c/Users/Usuario/PycharmProjects/agentes-chat
-git add -A
-git commit -m "Chat dos agentes"
-git remote add origin git@github.com:rdlorbieski/agentes-chat.git
-git push -u origin main
+git clone git@github.com:rdlorbieski/agentes-chat.git
+cd agentes-chat
+cp .env.example .env
+nano .env
 ```
 
-### 2. Criar o token de leitura do GitHub
+   No `.env`, preencha:
+   - `ANTHROPIC_API_KEY`: chave criada em https://console.anthropic.com, de
+     preferência num workspace com limite de gasto mensal.
+   - `GITHUB_TOKEN`: token criado em
+     https://github.com/settings/personal-access-tokens/new, com acesso só a
+     `fitame-agentes` e `ciga-agentes` e as permissões **Issues** e
+     **Contents** em *Read-only*.
+   - `APP_USUARIO` e `APP_SENHA`: o login do chat.
 
-Em https://github.com/settings/personal-access-tokens/new:
+4. **Subir:**
 
-- **Repository access:** *Only select repositories*, marque `fitame-agentes`
-  e `ciga-agentes`.
-- **Permissions → Repository permissions:** adicione **Issues** e
-  **Contents**, os dois em *Read-only*.
+```bash
+bash deploy_prod.sh
+```
 
-### 3. Criar a chave da API do Claude
+### Atualizar
 
-Em https://console.anthropic.com, crie um workspace só para o chat, com
-**limite de gasto mensal** (ex.: US$ 20), e uma chave de API nesse
-workspace. O chat é pago por uso (veja Custos).
+Depois de um push na `main`, na VPS:
 
-### 4. Publicar
+```bash
+cd agentes-chat && bash deploy_prod.sh
+```
 
-1. Entre em https://share.streamlit.io com a sua conta do GitHub e autorize o
-   acesso aos repositórios privados.
-2. **Create app → Deploy a public app from GitHub**: repositório
-   `rdlorbieski/agentes-chat`, branch `main`, arquivo `app.py`.
-3. Em **Advanced settings**: Python **3.12**, e no campo **Secrets** cole o
-   conteúdo de `.streamlit/secrets.toml.example` com os valores de verdade:
-   o token do passo 2, a chave do passo 3 e uma senha longa em `APP_SENHA`.
-4. **Deploy.**
+As conversas ficam no volume `conversas` e não se perdem no deploy. Para
+fazer uma cópia do banco:
 
-### 5. Fechar o acesso
-
-O app sai com um endereço `https://...streamlit.app`. Para ninguém além de
-você abrir:
-
-- Em **Settings → Sharing** do app, escolha *Only specific people can view
-  this app* e adicione o seu e-mail. O Streamlit pede login antes de mostrar
-  o app.
-- Além disso, o próprio app pede a senha `APP_SENHA`.
+```bash
+docker cp lorbieski-chat-agentes:/app/data/conversas.db ./conversas-$(date +%F).db
+```
 
 ## Custos
 
@@ -96,26 +114,29 @@ esforço `medium`) e uma campanha de uns 25 mil tokens:
 - **Transcrição de reunião:** uma reunião de 1 hora soma uns 15 mil tokens.
 
 O custo estimado de cada resposta aparece embaixo dela. Para gastar cerca da
-metade, use `MODELO = "claude-sonnet-5-5"` nos secrets. Se o modelo recusar um
+metade, use `MODELO=claude-sonnet-5-5` no `.env`. Se o modelo recusar um
 pedido por política de segurança, o servidor tenta outro modelo na mesma
 chamada (`fallbacks: "default"`).
 
 ## Rodar no seu computador
 
+Com Docker, igual à VPS mas com a porta aberta em http://localhost:8501:
+
 ```bash
-cd /c/Users/Usuario/PycharmProjects/agentes-chat
+cp .env.example .env
+docker compose --profile local up --build
+```
+
+Sem Docker:
+
+```bash
 py -3.12 -m venv .venv
 .venv/Scripts/python -m pip install -r requirements-dev.txt
 cp .streamlit/secrets.toml.example .streamlit/secrets.toml
-```
-
-Preencha o `.streamlit/secrets.toml` e rode:
-
-```bash
 .venv/Scripts/python -m streamlit run app.py
 ```
 
-Testes (não chamam o GitHub nem o Claude):
+Testes (não chamam o GitHub nem o Claude e não leem os seus segredos):
 
 ```bash
 .venv/Scripts/python -m pytest -q
@@ -125,13 +146,16 @@ Testes (não chamam o GitHub nem o Claude):
 
 | Arquivo | O que faz |
 |---|---|
-| `app.py` | A tela: senha, projeto, campanha, transcrições e o chat |
+| `app.py` | A tela: login, projeto, campanha, reuniões, conversas e o chat |
+| `chatbot/armazenamento.py` | SQLite com conversas, mensagens e transcrições |
 | `chatbot/github.py` | Lê as issues de prioridades e os arquivos do repositório de agentes |
 | `chatbot/campanhas.py` | Extrai tarefas, horas e achados de cada issue |
 | `chatbot/transcricao.py` | Limpa `.srt`, `.vtt` e `.txt` (tempos, numeração, falas repetidas) |
 | `chatbot/prompt.py` | Instruções e montagem do contexto, na ordem que aproveita o cache |
 | `chatbot/claude.py` | Chamada ao Claude com streaming, erros e custo estimado |
-| `chatbot/config.py` | Secrets e os dois projetos |
+| `chatbot/config.py` | Configuração e os dois projetos |
+| `Dockerfile`, `docker-compose.yml`, `deploy_prod.sh` | Deploy na VPS |
+| `infra/Caddyfile.trecho` | Bloco do Caddy para o domínio |
 
 Para acrescentar um terceiro projeto, inclua-o em `projetos()` em
 `chatbot/config.py`. Basta o repositório de agentes publicar issues com a

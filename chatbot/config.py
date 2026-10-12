@@ -4,17 +4,19 @@ import os
 from dataclasses import dataclass
 
 
-def config(nome, padrao=None):
-    """Variável de ambiente primeiro; depois os secrets do Streamlit; depois o padrão."""
-    valor = os.environ.get(nome)
-    if valor:
-        return valor
+def _secret(nome):
+    """Valor do .streamlit/secrets.toml, ou None se o arquivo ou a chave não existir."""
     try:
         import streamlit as st
 
-        valor = st.secrets.get(nome)
+        return st.secrets.get(nome)
     except Exception:  # noqa: BLE001 - sem secrets.toml o Streamlit levanta erros variados
-        valor = None
+        return None
+
+
+def config(nome, padrao=None):
+    """Variável de ambiente primeiro; depois os secrets do Streamlit; depois o padrão."""
+    valor = os.environ.get(nome) or _secret(nome)
     return str(valor) if valor else padrao
 
 

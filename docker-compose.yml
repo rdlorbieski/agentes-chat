@@ -1,0 +1,36 @@
+services:
+  # ===== PROD (VPS) ===== https://chat-agentes.lorbieski.com.br, via Caddy na network edge
+  chat:
+    profiles: ["prod"]
+    build: .
+    container_name: lorbieski-chat-agentes
+    restart: unless-stopped
+    env_file: .env
+    expose:
+      - "8501"
+    volumes:
+      - conversas:/app/data
+    networks:
+      - edge
+
+  # ===== LOCAL ===== Abre em http://localhost:8501/
+  chat-local:
+    profiles: ["local"]
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8501:8501"
+    volumes:
+      - conversas-local:/app/data
+
+volumes:
+  # O SQLite com as conversas. Sobrevive a cada deploy; só some com
+  # `docker volume rm`.
+  conversas:
+  conversas-local:
+
+networks:
+  # network usada na VPS, criada fora do compose (pelo infra-edge)
+  edge:
+    external: true

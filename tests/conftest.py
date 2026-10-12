@@ -61,6 +61,17 @@ def issue(numero, corpo=CORPO_FITAME, estado="open", criada="2026-10-12T15:00:00
     }
 
 
+@pytest.fixture(autouse=True)
+def sem_secrets_reais(monkeypatch):
+    """Os testes nunca leem o .streamlit/secrets.toml de quem está rodando."""
+    import chatbot.config
+
+    monkeypatch.setattr(chatbot.config, "_secret", lambda nome: None)
+    for nome in ("ANTHROPIC_API_KEY", "GITHUB_TOKEN", "APP_USUARIO", "APP_SENHA", "MODELO",
+                 "ESFORCO", "REPO_FITAME", "REPO_CIGA", "DB_PATH"):
+        monkeypatch.delenv(nome, raising=False)
+
+
 @pytest.fixture
 def issue_fitame():
     return issue(3)

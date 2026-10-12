@@ -1,0 +1,11 @@
+# --- Chat dos agentes (fitame-agentes e ciga-agentes) ---
+# Cole no Caddyfile do Caddy da VPS (o que publica as portas 80/443 na network
+# edge) e reinicie o Caddy. O Streamlit usa WebSocket; o reverse_proxy do Caddy
+# já repassa a conexão sem configuração extra.
+chat-agentes.lorbieski.com.br {
+	request_body {
+		max_size 20MB
+	}
+
+	reverse_proxy lorbieski-chat-agentes:8501
+}
